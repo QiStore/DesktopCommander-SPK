@@ -11,6 +11,5 @@ thirdparty="yes"
 startable="yes"
 ctl_stop="yes"
 ctl_uninstall="yes"
-install_dep_packages="yes"
 firmware="DSM 6.2.3-25426"
 
