@@ -28,7 +28,7 @@ mkdir -p "$OUT/root/target/upstream" "$OUT/root/target/runtime" "$OUT/root/var"
 
 # Upstream postinstall sends installation-source telemetry. Skip lifecycle hooks;
 # the package is built explicitly below and its scripts are not needed at runtime.
-(cd "$UPSTREAM_DIR" && npm ci --ignore-scripts && npm run build)
+(cd "$UPSTREAM_DIR" && npm ci --ignore-scripts && npm run build && npm prune --omit=dev --ignore-scripts)
 cp -a "$UPSTREAM_DIR"/. "$OUT/root/target/upstream/"
 rm -rf "$OUT/root/target/upstream/.git" "$OUT/root/target/upstream/node_modules"
 cp -a "$UPSTREAM_DIR/node_modules" "$OUT/root/target/upstream/node_modules"
