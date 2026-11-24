@@ -39,7 +39,7 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" sh scripts/build-spk.sh'
       - name: 验证 SPK 结构
-        run: sh scripts/check-spk.sh build/DesktopCommanderSPK-1.0.0-0002-bromolow.spk
+        run: sh scripts/check-spk.sh build/DesktopCommanderSPK-1.0.0-0003-bromolow.spk
       - name: 上传内部构建产物
         uses: actions/upload-artifact@v4
         with:
