@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desktop Commander</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; color: #172033; background: #f3f6fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; }
+    main { max-width: 760px; margin: 0 auto; }
+    header { margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: 25px; }
+    .muted { color: #68758b; }
+    .card { background: #fff; border: 1px solid #dfe6f0; border-radius: 12px; padding: 24px; box-shadow: 0 6px 22px #1c355414; }
+    .row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #edf0f5; }
+    .row:last-child { border-bottom: 0; }
+    .label { color: #68758b; }
+    #status { font-weight: 650; }
+    .code { font: 700 25px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; color: #116bb5; }
+    .notice { margin-top: 18px; padding: 14px 16px; border-radius: 8px; background: #eef7ff; color: #214a6b; line-height: 1.55; }
+    a.button { display: inline-block; margin-top: 16px; padding: 10px 16px; border-radius: 7px; background: #0879c9; color: white; text-decoration: none; }
+    .error { color: #a53a2b; }
+    @media (max-width: 560px) { body { padding: 18px; } .card { padding: 18px; } .row { display: block; } .label { display: block; margin-bottom: 6px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Desktop Commander</h1>
+      <div class="muted">NAS 远程设备授权与服务状态</div>
+    </header>
+    <section class="card" aria-live="polite">
+      <div class="row"><span class="label">服务状态</span><span id="status">正在读取…</span></div>
+      <div class="row" id="codeRow" hidden><span class="label">设备授权码</span><span class="code" id="code"></span></div>
+      <div class="row" id="expiryRow" hidden><span class="label">授权码有效期</span><span id="expiry"></span></div>
+      <div class="notice" id="message">页面会自动检测设备授权请求。检测到授权链接后，将自动在此窗口打开官方验证页面。</div>
+      <a class="button" id="manualLink" href="#" target="_blank" rel="noopener" hidden>手动打开官方授权页面</a>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const status = document.getElementById('status');
+      const codeRow = document.getElementById('codeRow');
+      const code = document.getElementById('code');
+      const expiryRow = document.getElementById('expiryRow');
+      const expiry = document.getElementById('expiry');
+      const message = document.getElementById('message');
+      const manualLink = document.getElementById('manualLink');
+      const openedKey = 'desktop-commander-auth-opened';
+      let lastState = '';
+      let synoToken = '';
+
+      async function getSynoToken() {
+        if (synoToken) return synoToken;
+        try {
+          const response = await fetch('/webman/login.cgi', { cache: 'no-store', credentials: 'same-origin' });
+          const data = await response.json();
+          if (data && data.result === 'success' && typeof data.SynoToken === 'string') synoToken = data.SynoToken;
+        } catch { /* auth.cgi still performs DSM session validation */ }
+        return synoToken;
+      }
+
+      function trustedAuthorizationUrl(value) {
+        try {
+          const url = new URL(value);
+          return url.protocol === 'https:' && (url.hostname === 'desktopcommander.app' || url.hostname.endsWith('.desktopcommander.app')) ? url.href : '';
+        } catch { return ''; }
+      }
+
+      async function refresh() {
+        try {
+          const token = await getSynoToken();
+          const endpoint = token ? `auth.cgi?SynoToken=${encodeURIComponent(token)}` : 'auth.cgi';
+          const response = await fetch(endpoint, { cache: 'no-store', credentials: 'same-origin' });
+          if (response.status === 401) { status.textContent = '请先登录 DSM'; return; }
+          if (response.status === 403) { status.textContent = '需要 DSM 管理员权限'; return; }
+          const data = await response.json();
+          if (data.state === 'pending' && Date.now() < Number(data.expiresAt)) {
+            status.textContent = '等待设备授权';
+            code.textContent = String(data.userCode || '');
+            codeRow.hidden = !data.userCode;
+            const remaining = Math.max(0, Math.ceil((Number(data.expiresAt) - Date.now()) / 1000));
+            expiry.textContent = `${Math.floor(remaining / 60)} 分 ${remaining % 60} 秒`;
+            expiryRow.hidden = false;
+            const url = trustedAuthorizationUrl(data.verificationUrl);
+            if (url) {
+              manualLink.href = url;
+              manualLink.hidden = false;
+              message.textContent = '检测到官方设备授权请求，正在自动打开验证页面…';
+              if (sessionStorage.getItem(openedKey) !== data.userCode && lastState !== data.userCode) {
+                sessionStorage.setItem(openedKey, data.userCode);
+                lastState = data.userCode;
+                setTimeout(() => window.location.replace(url), 700);
+              } else if (sessionStorage.getItem(openedKey) === data.userCode) {
+                message.textContent = '授权页面已自动打开。若已完成授权，可关闭此窗口；否则可使用下方链接继续。';
+              }
+            } else {
+              message.textContent = '授权链接未通过官方域名校验，已阻止自动跳转。';
+              message.classList.add('error');
+            }
+          } else if (data.state === 'authorized') {
+            status.textContent = '已授权'; codeRow.hidden = true; expiryRow.hidden = true;
+            manualLink.hidden = true; message.textContent = '设备授权已完成，Desktop Commander 正在连接。';
+          } else if (data.state === 'failed') {
+            status.textContent = '授权失败或已过期'; codeRow.hidden = true; expiryRow.hidden = true;
+            message.textContent = '请在套件中心重启 Desktop Commander 以重新发起授权。';
+          } else {
+            status.textContent = '等待授权请求'; codeRow.hidden = true; expiryRow.hidden = true;
+            message.textContent = '服务连接后，本页面会自动检测授权请求并打开官方验证页面。';
+          }
+        } catch {
+          status.textContent = '暂时无法读取状态';
+          message.textContent = '请确认套件已启动，并保持 DSM 管理员登录状态。页面会自动重试。';
+        }
+      }
+      refresh();
+      setInterval(refresh, 2000);
+    })();
+  </script>
+</body>
+</html>

@@ -37,6 +37,86 @@ index 77efa9b..fdeaa97 100644
  
  export function isConfigFieldKey(value: string): value is ConfigFieldKey {
    return Object.prototype.hasOwnProperty.call(CONFIG_FIELD_DEFINITIONS, value);
+diff --git a/src/remote-device/device-authenticator.ts b/src/remote-device/device-authenticator.ts
+index 7e63c8f..317587c 100644
+--- a/src/remote-device/device-authenticator.ts
++++ b/src/remote-device/device-authenticator.ts
+@@ -1,8 +1,11 @@
+ import open from 'open';
+ import os from 'os';
+ import crypto from 'crypto';
++import fs from 'node:fs/promises';
++import path from 'node:path';
+ import { captureRemote } from '../utils/capture.js';
+ import { observeServerDate } from './remote-channel.js';
++import { writeFileAtomic } from '../utils/atomic-write.js';
+ 
+ interface AuthSession {
+     access_token: string;
+@@ -63,10 +66,17 @@ export class DeviceAuthenticator {
+         const deviceAuth = await this.requestDeviceCode(pkce.challenge, deviceId);
+ 
+         // Step 2: Display user instructions and open browser
+-        this.displayUserInstructions(deviceAuth);
++        await this.displayUserInstructions(deviceAuth);
+ 
+         // Step 3: Poll for authorization
+-        const tokens = await this.pollForAuthorization(deviceAuth, pkce.verifier);
++        let tokens: AuthSession;
++        try {
++            tokens = await this.pollForAuthorization(deviceAuth, pkce.verifier);
++        } catch (error) {
++            await this.publishUiState({ state: 'failed', updatedAt: Date.now() });
++            throw error;
++        }
++        await this.publishUiState({ state: 'authorized', updatedAt: Date.now() });
+ 
+         console.log('✅ Device verified\n');
+ 
+@@ -132,7 +142,27 @@ export class DeviceAuthenticator {
+         return data;
+     }
+ 
+-    private displayUserInstructions(deviceAuth: DeviceAuthResponse): void {
++    private async displayUserInstructions(deviceAuth: DeviceAuthResponse): Promise<void> {
++        const verificationUrl = new URL(deviceAuth.verification_uri_complete);
++        const trustedHost = verificationUrl.hostname === 'desktopcommander.app' ||
++            verificationUrl.hostname.endsWith('.desktopcommander.app');
++        if (verificationUrl.protocol !== 'https:' || !trustedHost) {
++            throw new Error('Remote authorization returned an untrusted verification URL');
++        }
++        const statusPath = process.env.DC_AUTH_STATUS_FILE;
++        if (statusPath) {
++            await this.publishUiState({
++                state: 'pending',
++                verificationUrl: verificationUrl.toString(),
++                userCode: deviceAuth.user_code,
++                expiresAt: Date.now() + deviceAuth.expires_in * 1000,
++                updatedAt: Date.now(),
++            });
++            console.log('📋 Authorization is ready. Open Desktop Commander in DSM to continue.');
++            console.log('   - ⏳ Waiting for authorization...\n');
++            return;
++        }
++
+         console.log('📋 Please complete authentication:\n');
+         console.log('   1. Verify this device in your browser:');
+         console.log(`      ${deviceAuth.verification_uri_complete}\n`);
+@@ -153,6 +183,14 @@ export class DeviceAuthenticator {
+         console.log('   - ⏳ Waiting for authorization...\n');
+     }
+ 
++    private async publishUiState(state: Record<string, string | number>): Promise<void> {
++        const statusPath = process.env.DC_AUTH_STATUS_FILE;
++        if (!statusPath) return;
++        await fs.mkdir(path.dirname(statusPath), { recursive: true, mode: 0o700 });
++        await writeFileAtomic(statusPath, JSON.stringify(state), { mode: 0o640 });
++        await fs.chmod(statusPath, 0o640);
++    }
++
+     private async pollForAuthorization(deviceAuth: DeviceAuthResponse, codeVerifier: string): Promise<AuthSession> {
+         const interval = (deviceAuth.interval || 5) * 1000;
+         const maxAttempts = Math.floor(deviceAuth.expires_in / (deviceAuth.interval || 5));
 diff --git a/src/tools/config.ts b/src/tools/config.ts
 index eba9deb..e7f88c4 100644
 --- a/src/tools/config.ts
