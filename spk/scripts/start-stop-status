@@ -34,7 +34,9 @@ start() {
     cd "$PKGDEST/upstream"
     # The upstream Remote Device Agent starts its local MCP server as a child
     # and connects outbound to the official Remote MCP service.
-    nohup env HOME="$HOME_DIR" PATH="$PKGDEST/runtime:$PATH" DC_REMOTE_DEVICE=true DESKTOP_COMMANDER_DISABLE_TELEMETRY=1 \
+    nohup env HOME="$HOME_DIR" PATH="$PKGDEST/runtime:$PATH" DC_NODE_LAUNCHER="$NODE" \
+        NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require=$PKGDEST/runtime/exec-path-fix.cjs" \
+        DC_REMOTE_DEVICE=true DESKTOP_COMMANDER_DISABLE_TELEMETRY=1 \
         "$NODE" "$APP" remote --disable-no-sleep >>"$LOG_FILE" 2>&1 </dev/null &
     echo "$!" > "$PID_FILE"
     chmod 600 "$PID_FILE" "$LOG_FILE" 2>/dev/null || true
