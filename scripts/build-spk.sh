@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT="${OUT_DIR:-$ROOT/build}"
 UPSTREAM_DIR="${UPSTREAM_DIR:-$ROOT/vendor/DesktopCommanderMCP}"
 NODE_BINARY="${NODE_BINARY:-$(command -v node || true)}"
-PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0004}"
+PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0005}"
 
 [ -n "$NODE_BINARY" ] || { echo "缺少 NODE_BINARY。" >&2; exit 1; }
 [ -f "$UPSTREAM_DIR/package.json" ] || { echo "找不到上游源码：$UPSTREAM_DIR" >&2; exit 1; }
@@ -71,6 +71,12 @@ cp "$UPSTREAM_DIR/LICENSE" "$OUT/root/target/NOTICE-DesktopCommander-MIT.txt"
 cp "$ROOT/vendor/upstream.lock" "$OUT/root/target/UPSTREAM-VERSION.txt"
 mkdir -p "$OUT/root/target/ui"
 cp "$ROOT/docs/安全设计.md" "$OUT/root/target/ui/安全说明.txt"
+cp -a "$ROOT/spk/ui/." "$OUT/root/target/ui/"
+chmod 755 "$OUT/root/target/ui/auth.cgi"
+mkdir -p "$OUT/root/target/ui/images"
+for size in 16 24 32 48 64 72 256; do
+    cp "$UPSTREAM_DIR/logo.png" "$OUT/root/target/ui/images/icon_${size}.png"
+done
 
 # A test-build package is not a release. Formal release is gated by NAS evidence.
 sed -i "s/^version=.*/version=\"$PACKAGE_VERSION\"/" "$OUT/root/INFO"
