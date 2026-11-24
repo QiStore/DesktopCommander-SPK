@@ -1,12 +1,30 @@
 #!/bin/sh
 set -eu
 
-VAR="${SYNOPKG_PKGVAR:-/var/packages/DesktopCommander-SPK/var}"
-mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
-chmod 700 "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+PKG="DesktopCommander-SPK"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/pkgvar"
+VAR="$(dc_pkgvar)"
 CONFIG="$VAR/home/.claude-server-commander/config.json"
+
+fail() {
+    rc=$?
+    if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+        printf 'Desktop Commander 初始化失败（退出码 %s），数据目录：%s\n' "$rc" "$VAR" > "$SYNOPKG_TEMP_LOGFILE"
+    fi
+    exit "$rc"
+}
+trap fail EXIT HUP INT TERM
+
+# This hook runs as root only to create the package-owned persistent data
+# directory. The service and all data remain owned by the unprivileged package account.
+id "$PKG" >/dev/null 2>&1 || { echo "套件服务账户不存在：$PKG" >&2; exit 1; }
+mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+chown "$PKG:$PKG" "$VAR" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+chmod 700 "$VAR" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
 if [ ! -s "$CONFIG" ]; then
     printf '%s\n' "{\"allowedDirectories\":[\"$VAR/workspace\"],\"telemetryEnabled\":false}" > "$CONFIG"
+    chown "$PKG:$PKG" "$CONFIG"
     chmod 600 "$CONFIG"
 fi
-
+trap - EXIT HUP INT TERM
