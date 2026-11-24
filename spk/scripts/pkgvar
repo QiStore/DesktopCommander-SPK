@@ -1,0 +1,20 @@
+#!/bin/sh
+# Resolve persistent package data across DSM 6 and DSM 7.
+dc_pkgvar() {
+    dc_pkg="${SYNOPKG_PKGNAME:-DesktopCommander-SPK}"
+    dc_major="${SYNOPKG_DSM_VERSION_MAJOR:-6}"
+    if [ "$dc_major" -ge 7 ] 2>/dev/null && [ -n "${SYNOPKG_PKGVAR:-}" ]; then
+        printf '%s\n' "$SYNOPKG_PKGVAR"
+        return 0
+    fi
+
+    dc_volume="${SYNOPKG_PKGDEST_VOL:-}"
+    if [ -z "$dc_volume" ]; then
+        dc_dest="${SYNOPKG_PKGDEST:-}"
+        case "$dc_dest" in
+            /volume[0-9]*/*) dc_volume="$(printf '%s\n' "$dc_dest" | sed 's#/[^/]*$##; s#/[^/]*$##')" ;;
+            *) dc_volume="/volume1" ;;
+        esac
+    fi
+    printf '%s/@appdata/%s\n' "$dc_volume" "$dc_pkg"
+}

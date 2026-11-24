@@ -3,7 +3,9 @@ set -eu
 
 PKG="DesktopCommander-SPK"
 PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
-PKGVAR="${SYNOPKG_PKGVAR:-/var/packages/$PKG/var}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/pkgvar"
+PKGVAR="$(dc_pkgvar)"
 NODE="$PKGDEST/runtime/node"
 APP="$PKGDEST/upstream/dist/index.js"
 HOME_DIR="$PKGVAR/home"

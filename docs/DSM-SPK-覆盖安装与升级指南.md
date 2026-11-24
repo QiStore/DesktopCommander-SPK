@@ -70,7 +70,7 @@ exit 0
 #!/bin/sh
 set -eu
 
-VAR="${SYNOPKG_PKGVAR:-/var/packages/YourPackageId/var}"
+在 DSM 7 上使用 `SYNOPKG_PKGVAR`；DSM 6 没有该 FHS 目录，必须由 root 级安装钩子在套件安装卷创建持久目录，并将目录所有权交给套件账户。例如可使用 `${SYNOPKG_PKGDEST_VOL}/@appdata/YourPackageId`。服务进程仍应以套件账户运行。
 mkdir -p "$VAR/config" "$VAR/log"
 chmod 700 "$VAR/config"
 
