@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "run-as": "package"
+  },
+  "ctrl-script": [
+    { "action": "start", "run-as": "package" },
+    { "action": "stop", "run-as": "package" },
+    { "action": "status", "run-as": "package" },
+    { "action": "postinst", "run-as": "package" },
+    { "action": "postupgrade", "run-as": "package" },
+    { "action": "preuninst", "run-as": "package" },
+    { "action": "postuninst", "run-as": "package" }
+  ]
+}
+

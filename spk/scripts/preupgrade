@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ "${SYNOPKG_PKGNAME:-DesktopCommander-SPK}" != "DesktopCommander-SPK" ]; then
+    echo "套件身份不匹配，已停止升级。" >&2
+    exit 1
+fi
+

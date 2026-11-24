@@ -1,0 +1,43 @@
+name: 正式版发布
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出套件源码
+        uses: actions/checkout@v4
+      - name: 检出锁定的 Desktop Commander 上游源码
+        uses: actions/checkout@v4
+        with:
+          repository: wonderwhy-er/DesktopCommanderMCP
+          ref: 9a101b17e44577f0baefa4c7120f087881c5cc56
+          path: vendor/DesktopCommanderMCP
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - name: 阻止未验收版本发布
+        run: |
+          test -f evidence/1.0.0-nas-acceptance.json || { echo "缺少 DS3615xs-j 1.0.0 实机验收记录" >&2; exit 1; }
+          node scripts/verify-release-evidence.mjs evidence/1.0.0-nas-acceptance.json
+      - name: 构建正式 SPK
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work -e PACKAGE_VERSION="$VERSION-0001" node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" PACKAGE_VERSION="$PACKAGE_VERSION" scripts/build-spk.sh'
+      - name: 检查正式 SPK
+        run: scripts/check-spk.sh "build/DesktopCommanderSPK-${GITHUB_REF_NAME#v}-0001-bromolow.spk"
+      - name: 发布正式 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Desktop Commander ${GITHUB_REF_NAME#v} 正式版
+          prerelease: false
+          draft: false
+          files: build/*.spk
+

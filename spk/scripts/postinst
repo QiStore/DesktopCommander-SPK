@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+VAR="${SYNOPKG_PKGVAR:-/var/packages/DesktopCommander-SPK/var}"
+mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+chmod 700 "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+CONFIG="$VAR/home/.claude-server-commander/config.json"
+if [ ! -s "$CONFIG" ]; then
+    printf '%s\n' "{\"allowedDirectories\":[\"$VAR/workspace\"],\"telemetryEnabled\":false}" > "$CONFIG"
+    chmod 600 "$CONFIG"
+fi
+

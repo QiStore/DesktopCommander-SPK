@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+# DSM also invokes postuninst during an in-place upgrade. Keep all persistent
+# state there; never remove it from this hook.
+if [ "${SYNOPKG_PKG_STATUS:-}" = "UPGRADE" ]; then
+    exit 0
+fi
+# The data-preservation choice will be implemented by the DSM uninstall wizard.
+# Until then, the safe default is to retain authorization and workspace data.
+exit 0
+

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出套件源码
+        uses: actions/checkout@v4
+      - name: 检出锁定的 Desktop Commander 上游源码
+        uses: actions/checkout@v4
+        with:
+          repository: wonderwhy-er/DesktopCommanderMCP
+          ref: 9a101b17e44577f0baefa4c7120f087881c5cc56
+          path: vendor/DesktopCommanderMCP
+      - name: 检查上游许可证与锁定提交
+        run: |
+          test "$(git -C vendor/DesktopCommanderMCP rev-parse HEAD)" = "9a101b17e44577f0baefa4c7120f087881c5cc56"
+          grep -q 'MIT License' vendor/DesktopCommanderMCP/LICENSE
+          grep -q 'license.*MIT' vendor/DesktopCommanderMCP/package.json
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - name: 检查套件生命周期脚本
+        run: |
+          sh -n spk/scripts/*
+          sh -n scripts/*.sh
+      - name: 构建 Bromolow SPK 候选包
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" scripts/build-spk.sh'
+      - name: 验证 SPK 结构
+        run: scripts/check-spk.sh build/DesktopCommanderSPK-1.0.0-0001-bromolow.spk
+      - name: 上传内部构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: DesktopCommanderSPK-internal-bromolow
+          path: build/*.spk
+          if-no-files-found: error
+          retention-days: 14
+

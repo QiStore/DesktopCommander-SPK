@@ -1,0 +1,22 @@
+{
+  "target": "DS3615xs-j / DSM 6.2.3-25426 / bromolow",
+  "tested_at": null,
+  "evidence": [],
+  "acceptance": {
+    "install": false,
+    "package_center": false,
+    "start_stop_restart": false,
+    "boot_autostart": false,
+    "upgrade_preserves_data": false,
+    "device_authorization": false,
+    "chatgpt_connection": false,
+    "mcp_discovery_and_calls": false,
+    "system_information": false,
+    "shell_and_processes": false,
+    "scoped_file_read_write": false,
+    "upload_download": false,
+    "log_management": false,
+    "windows_offline_nas_online": false
+  }
+}
+

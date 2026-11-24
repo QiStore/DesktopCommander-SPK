@@ -1,0 +1,86 @@
+diff --git a/src/config-field-definitions.ts b/src/config-field-definitions.ts
+index 77efa9b..fdeaa97 100644
+--- a/src/config-field-definitions.ts
++++ b/src/config-field-definitions.ts
+@@ -10,12 +10,12 @@ export type ConfigFieldDefinition = {
+ export const CONFIG_FIELD_DEFINITIONS = {
+   blockedCommands: {
+     label: 'Blocked Commands',
+-    description: 'This is your personal safety blocklist. If a command appears here, Desktop Commander will refuse to run it even if a prompt asks for it. Add risky commands you never want executed by mistake.',
++    description: 'This is your personal safety blocklist. If a command appears here, Desktop Commander will refuse to run it even if a prompt asks for it.',
+     valueType: 'array',
+   },
+   allowedDirectories: {
+     label: 'Allowed Folders',
+-    description: 'These are the folders Desktop Commander is allowed to read and edit. Think of this as a permission list. Keeping it small is safer. If this list is empty, Desktop Commander can access your entire filesystem.',
++    description: 'Folders Desktop Commander is allowed to read and edit. Empty means unrestricted, so this field is managed only by the package administrator.',
+     valueType: 'array',
+   },
+   defaultShell: {
+@@ -25,7 +25,7 @@ export const CONFIG_FIELD_DEFINITIONS = {
+   },
+   telemetryEnabled: {
+     label: 'Anonymous Telemetry',
+-    description: 'When on, Desktop Commander sends anonymous usage information that helps improve product quality. When off, no telemetry data is sent.',
++    description: 'Telemetry is disabled by package policy and managed only by the package administrator.',
+     valueType: 'boolean',
+   },
+   fileReadLineLimit: {
+@@ -42,7 +42,9 @@ export const CONFIG_FIELD_DEFINITIONS = {
+ 
+ export type ConfigFieldKey = keyof typeof CONFIG_FIELD_DEFINITIONS;
+ 
+-export const CONFIG_FIELD_KEYS = Object.keys(CONFIG_FIELD_DEFINITIONS) as ConfigFieldKey[];
++// Expose only low-risk operational values through MCP; package security policy
++// fields must not be writable by a connected remote client.
++export const CONFIG_FIELD_KEYS = ['defaultShell', 'fileReadLineLimit', 'fileWriteLineLimit'] as ConfigFieldKey[];
+ 
+ export function isConfigFieldKey(value: string): value is ConfigFieldKey {
+   return Object.prototype.hasOwnProperty.call(CONFIG_FIELD_DEFINITIONS, value);
+diff --git a/src/tools/config.ts b/src/tools/config.ts
+index eba9deb..e7f88c4 100644
+--- a/src/tools/config.ts
++++ b/src/tools/config.ts
+@@ -16,7 +16,6 @@ const ALLOWED_CONFIG_KEYS = new Set(CONFIG_FIELD_KEYS);
+  * Get the entire config including system information
+  */
+ export async function getConfig() {
+-  console.error('getConfig called');
+   try {
+     const config = await configManager.getConfig();
+     
+@@ -44,7 +43,6 @@ export async function getConfig() {
+     };
+     const availableShells = detectAvailableShells();
+     
+-    console.error(`getConfig result: ${JSON.stringify(configWithSystemInfo, null, 2)}`);
+     return {
+       content: [{
+         type: "text",
+@@ -84,7 +82,7 @@ export async function getConfig() {
+  * Set a specific config value
+  */
+ export async function setConfigValue(args: unknown) {
+-  console.error(`setConfigValue called with args: ${JSON.stringify(args)}`);
++  console.error('setConfigValue called');
+   try {
+     const parsed = SetConfigValueArgsSchema.safeParse(args);
+     if (!parsed.success) {
+@@ -118,7 +116,7 @@ export async function setConfigValue(args: unknown) {
+           (valueToStore.startsWith('[') || valueToStore.startsWith('{'))) {
+         try {
+           valueToStore = JSON.parse(valueToStore);
+-          console.error(`Parsed string value to object/array: ${JSON.stringify(valueToStore)}`);
++          console.error('Parsed string value to object/array');
+         } catch (parseError) {
+           console.error(`Failed to parse string as JSON, using as-is: ${parseError}`);
+         }
+@@ -192,7 +190,7 @@ export async function setConfigValue(args: unknown) {
+       await configManager.setValue(parsed.data.key, valueToStore, { holdIfNotSaved: true });
+       // Get the updated configuration to show the user
+       const updatedConfig = await configManager.getConfig();
+-      console.error(`setConfigValue: Successfully set ${parsed.data.key} to ${JSON.stringify(valueToStore)}`);
++      console.error(`setConfigValue: Successfully set ${parsed.data.key}`);
+       return {
+         content: [{
+           type: "text",
