@@ -27,7 +27,7 @@ start() {
     mkdir -p "$HOME_DIR/.claude-server-commander" "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
     chmod 700 "$HOME_DIR" "$HOME_DIR/.claude-server-commander" "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
     if [ ! -s "$HOME_DIR/.claude-server-commander/config.json" ]; then
-        printf '%s\n' "{\"allowedDirectories\":[\"$PKGVAR/workspace\"],\"telemetryEnabled\":false}" > "$HOME_DIR/.claude-server-commander/config.json"
+        printf '%s\n' '{"allowedDirectories":[],"telemetryEnabled":false}' > "$HOME_DIR/.claude-server-commander/config.json"
         chmod 600 "$HOME_DIR/.claude-server-commander/config.json"
     fi
 
