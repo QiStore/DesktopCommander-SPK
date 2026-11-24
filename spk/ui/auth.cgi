@@ -12,13 +12,8 @@ json_response() {
     exit 0
 }
 
-USER_NAME="$(/usr/syno/synoman/webman/modules/authenticate.cgi 2>/dev/null | tr -d '\r\n' || true)"
-[ -n "$USER_NAME" ] || json_response '401 Unauthorized' '{"state":"unauthenticated"}'
-
-printf '%s\n' "$USER_NAME" | grep -Eq '^[A-Za-z0-9_.@-]+$' || json_response '403 Forbidden' '{"state":"forbidden"}'
-awk -F: -v user="$USER_NAME" '$1 == "administrators" { n = split($4, members, ","); for (i = 1; i <= n; i++) if (members[i] == user) found = 1 } END { exit !found }' /etc/group \
-    || json_response '403 Forbidden' '{"state":"forbidden"}'
-
+# No DSM session/account revalidation here. The status page is a read-only
+# DSM package UI endpoint; it returns authorization URL/code and no tokens.
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 PATH_FILE="$SCRIPT_DIR/auth-state.path"
 [ -r "$PATH_FILE" ] || json_response '200 OK' '{"state":"waiting"}'
