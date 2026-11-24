@@ -5,6 +5,7 @@ PKG="DesktopCommander-SPK"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/pkgvar"
 VAR="$(dc_pkgvar)"
+PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
 CONFIG="$VAR/home/.claude-server-commander/config.json"
 
 fail() {
@@ -18,8 +19,16 @@ trap fail EXIT HUP INT TERM
 
 id "$PKG" >/dev/null 2>&1 || { echo "套件服务账户不存在：$PKG" >&2; exit 1; }
 mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
-chown "$PKG:$PKG" "$VAR" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
-chmod 700 "$VAR" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+chown "$PKG:http" "$VAR"
+chmod 2710 "$VAR"
+chown "$PKG:$PKG" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+chmod 700 "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+printf '%s\n' "$VAR/auth-state.json" > "$PKGDEST/ui/auth-state.path"
+chmod 644 "$PKGDEST/ui/auth-state.path"
+if [ -e "$VAR/auth-state.json" ]; then
+    chown "$PKG:http" "$VAR/auth-state.json"
+    chmod 640 "$VAR/auth-state.json"
+fi
 if [ ! -s "$CONFIG" ]; then
     printf '%s\n' "{\"allowedDirectories\":[\"$VAR/workspace\"],\"telemetryEnabled\":false}" > "$CONFIG"
     chown "$PKG:$PKG" "$CONFIG"
