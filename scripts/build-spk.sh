@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT="${OUT_DIR:-$ROOT/build}"
 UPSTREAM_DIR="${UPSTREAM_DIR:-$ROOT/vendor/DesktopCommanderMCP}"
 NODE_BINARY="${NODE_BINARY:-$(command -v node || true)}"
-PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0003}"
+PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0004}"
 
 [ -n "$NODE_BINARY" ] || { echo "缺少 NODE_BINARY。" >&2; exit 1; }
 [ -f "$UPSTREAM_DIR/package.json" ] || { echo "找不到上游源码：$UPSTREAM_DIR" >&2; exit 1; }
@@ -56,6 +56,14 @@ else
     cp "$OUT/root/target/runtime/bin/node" "$OUT/root/target/runtime/node"
 fi
 chmod 755 "$OUT/root/target/runtime/node"
+
+# Node reports the ELF interpreter (ld-musl) as process.execPath when launched
+# through a dynamic loader. Upstream uses process.execPath to spawn its local MCP
+# child, so restore the package launcher path before application modules run.
+cat > "$OUT/root/target/runtime/exec-path-fix.cjs" <<'EOF'
+const launcher = process.env.DC_NODE_LAUNCHER;
+if (launcher) process.execPath = launcher;
+EOF
 
 cp -a "$ROOT/spk/." "$OUT/root/"
 cp "$ROOT/LICENSE" "$OUT/root/target/NOTICE-QiStore-MIT.txt"
