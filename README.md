@@ -11,7 +11,7 @@ Synology DSM 原生 Desktop Commander 套件，目标设备为 DS3615xs-j / DSM 
 - 复用上游 [Desktop Commander MCP](https://github.com/wonderwhy-er/DesktopCommanderMCP) 的 MIT 授权本地 MCP 服务和 Remote Device Agent，固定到 `vendor/upstream.lock` 指定的源代码提交。
 - NAS 运行本地 MCP 服务和设备代理；设备代理使用 Desktop Commander 官方 Remote MCP 服务完成实际设备授权、工具转发及重连。这里不仿造 OAuth、不自建上游专有服务，也不把 NAS 本地状态冒充为 ChatGPT 连接状态。
 - 安装包须携带 Node.js 运行时和生产依赖。用户无需另外安装 Node.js、Docker 或 Windows 常驻进程。
-- MCP 文件访问从一个受限的专用工作目录开始；只把用户明确授权的共享目录加入 Desktop Commander 的 `allowedDirectories`。该列表不能为空，因为上游将空列表定义为不限制目录。
+- MCP 文件工具不设置 `allowedDirectories` 路径限制（使用空列表）；可请求 NAS 上任意路径，实际读写仍取决于 DSM 套件账户自身的文件权限。
 - 关闭上游遥测；设备授权凭据和工具配置存放在 DSM 持久套件变量目录，升级保留，卸载按用户选择处理。
 - 服务按 DSM 套件专用账户运行，不以 root 执行用户命令。
 - 从 DSM 桌面打开套件管理页后，页面会轮询上游真实设备授权状态；发现有效授权链接时自动在该窗口打开官方验证页面。授权码不写入普通服务日志。
