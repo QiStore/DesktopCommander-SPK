@@ -29,10 +29,28 @@ if [ -e "$VAR/auth-state.json" ]; then
     chown "$PKG:http" "$VAR/auth-state.json"
     chmod 640 "$VAR/auth-state.json"
 fi
-if [ ! -s "$CONFIG" ]; then
-    printf '%s\n' "{\"allowedDirectories\":[\"$VAR/workspace\"],\"telemetryEnabled\":false}" > "$CONFIG"
-    chown "$PKG:$PKG" "$CONFIG"
-    chmod 600 "$CONFIG"
-fi
-# Existing config, device authorization, logs, and workspace are preserved.
+# Call the bundled musl loader directly during installation. The node wrapper
+# uses dirname/find from PATH, which is not guaranteed in DSM lifecycle hooks.
+NODE_LOADER=""
+for candidate in "$PKGDEST"/runtime/lib/ld-musl-*.so.1; do
+    if [ -f "$candidate" ]; then NODE_LOADER="$candidate"; break; fi
+done
+[ -n "$NODE_LOADER" ] || { echo "套件 Node 运行时加载器不存在：$PKGDEST/runtime/lib" >&2; exit 127; }
+[ -x "$PKGDEST/runtime/bin/node" ] || { echo "套件 Node 可执行文件不存在：$PKGDEST/runtime/bin/node" >&2; exit 127; }
+# An empty allowedDirectories list means unrestricted paths in upstream.
+# Preserve other user settings while explicitly removing the package path allowlist.
+"$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" - "$CONFIG" <<'NODE'
+const fs = require('fs');
+const file = process.argv[2];
+let config = {};
+try { config = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) {}
+config.allowedDirectories = [];
+config.telemetryEnabled = false;
+const tmp = `${file}.tmp`;
+fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
+fs.renameSync(tmp, file);
+NODE
+chown "$PKG:$PKG" "$CONFIG"
+chmod 600 "$CONFIG"
+# Device authorization, other config fields, logs, and workspace are preserved.
 trap - EXIT HUP INT TERM
