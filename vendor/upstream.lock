@@ -1,0 +1,6 @@
+repository=https://github.com/wonderwhy-er/DesktopCommanderMCP.git
+commit=9a101b17e44577f0baefa4c7120f087881c5cc56
+license=MIT
+package=@wonderwhy-er/desktop-commander
+package_version=0.3.4
+remote_service=https://mcp.desktopcommander.app
