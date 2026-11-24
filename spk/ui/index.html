@@ -73,8 +73,6 @@
           const token = await getSynoToken();
           const endpoint = token ? `auth.cgi?SynoToken=${encodeURIComponent(token)}` : 'auth.cgi';
           const response = await fetch(endpoint, { cache: 'no-store', credentials: 'same-origin' });
-          if (response.status === 401) { status.textContent = '请先登录 DSM'; return; }
-          if (response.status === 403) { status.textContent = '需要 DSM 管理员权限'; return; }
           const data = await response.json();
           if (data.state === 'pending' && Date.now() < Number(data.expiresAt)) {
             status.textContent = '等待设备授权';

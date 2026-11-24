@@ -6,7 +6,7 @@
       "desc": "NAS 远程设备授权与服务状态",
       "icon": "images/icon_{0}.png",
       "url": "3rdparty/DesktopCommander-SPK/index.html",
-      "allUsers": false
+      "allUsers": true
     }
   }
 }
