@@ -4,7 +4,7 @@ Synology DSM 原生 Desktop Commander 套件，目标设备为 DS3615xs-j / DSM 
 
 ## 项目状态
 
-Desktop Commander SPK **1.0.0 正式版已发布**。正式 SPK 内部版本为 `1.0.0-0016`，可从目标 NAS 上的 `1.0.0-0015` 候选包直接覆盖升级。
+Desktop Commander SPK **1.0.0 正式版已发布，DS3615xs-j 目标 NAS 的 14 项实机验收全部通过**。正式 SPK 内部版本为 `1.0.0-0016`，可从目标 NAS 上的 `1.0.0-0015` 候选包直接覆盖升级。
 
 - 正式验收记录：[实机验收证据](evidence/1.0.0-nas-acceptance-notes.md)
 - 正式 Release：[Desktop Commander v1.0.0](https://github.com/QiStore/DesktopCommander-SPK/releases/tag/v1.0.0)
