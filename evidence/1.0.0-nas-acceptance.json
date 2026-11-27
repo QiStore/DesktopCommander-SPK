@@ -1,0 +1,25 @@
+{
+  "target": "DS3615xs-j / DSM 6.2.3-25426 / bromolow",
+  "tested_at": "2026-11-27",
+  "evidence": [
+    "evidence/1.0.0-nas-acceptance-notes.md",
+    "项目维护者于 2026-11-27 确认 14 项目标 NAS 实机验收均已通过。",
+    "发布前在线复核：套件状态 started，安装版本 1.0.0-0015；supervisor、Remote Device Agent 与 MCP 子进程均以 UID 0 运行；Desktop Commander 工具调用可在 NAS 执行命令。"
+  ],
+  "acceptance": {
+    "install": true,
+    "package_center": true,
+    "start_stop_restart": true,
+    "boot_autostart": true,
+    "upgrade_preserves_data": true,
+    "device_authorization": true,
+    "chatgpt_connection": true,
+    "mcp_discovery_and_calls": true,
+    "system_information": true,
+    "shell_and_processes": true,
+    "scoped_file_read_write": true,
+    "upload_download": true,
+    "log_management": true,
+    "windows_offline_nas_online": true
+  }
+}
