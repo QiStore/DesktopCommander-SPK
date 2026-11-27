@@ -96,7 +96,7 @@
         const button=el('save'),out=el('saveState');button.disabled=true;out.classList.remove('error');out.textContent='正在保存…';
         try{
           const selected=[...shares.querySelectorAll('input:checked')].map(x=>x.value);
-          const response=await fetch('settings.cgi',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-SynoToken':await getSynoToken()},body:JSON.stringify({sharedDirectories:selected,autostart:el('autostart').checked})});
+          const response=await fetch('settings.cgi',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-SYNO-TOKEN':await getSynoToken()},body:JSON.stringify({sharedDirectories:selected,autostart:el('autostart').checked})});
           const data=await response.json();if(!response.ok||data.error)throw new Error(data.error||'保存失败');out.textContent='设置已保存。';
         }catch(e){out.textContent=e.message||'保存失败';out.classList.add('error');}
         finally{button.disabled=false;}
