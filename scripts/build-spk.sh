@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT="${OUT_DIR:-$ROOT/build}"
 UPSTREAM_DIR="${UPSTREAM_DIR:-$ROOT/vendor/DesktopCommanderMCP}"
 NODE_BINARY="${NODE_BINARY:-$(command -v node || true)}"
-PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0013}"
+PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0014}"
 
 [ -n "$NODE_BINARY" ] || { echo "缺少 NODE_BINARY。" >&2; exit 1; }
 [ -f "$UPSTREAM_DIR/package.json" ] || { echo "找不到上游源码：$UPSTREAM_DIR" >&2; exit 1; }
