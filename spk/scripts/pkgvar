@@ -12,7 +12,8 @@ dc_pkgvar() {
     if [ -z "$dc_volume" ]; then
         dc_dest="${SYNOPKG_PKGDEST:-}"
         case "$dc_dest" in
-            /volume[0-9]*/*) dc_volume="$(printf '%s\n' "$dc_dest" | sed 's#/[^/]*$##; s#/[^/]*$##')" ;;
+        /volume[0-9]*/@appstore/*) dc_volume="${dc_dest%%/@appstore/*}" ;;
+        /volume[0-9]*/*) dc_volume="${dc_dest%/*}" ;;
             *) dc_volume="/volume1" ;;
         esac
     fi

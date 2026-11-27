@@ -28,5 +28,5 @@ mkdir -p "$TMP/package"
 tar -xzf "$TMP/package.tgz" -C "$TMP/package"
 sh -n "$TMP/scripts/start-stop-status" "$TMP/scripts/preupgrade" "$TMP/scripts/postupgrade" "$TMP/scripts/postuninst"
 sh -n "$TMP/package/ui/auth.cgi"
+grep -q '^unset LD_PRELOAD LD_LIBRARY_PATH$' "$TMP/package/runtime/node" || { echo "Node 启动器未清除 DSM 注入的宿主加载器变量。" >&2; exit 1; }
 echo "SPK 结构、元数据及生命周期脚本语法检查通过。此检查不等同于 DSM 实机安装。"
-
