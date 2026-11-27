@@ -84,7 +84,8 @@
       }
       async function loadSettings(){
         try{
-          const r=await fetch('settings.cgi',{cache:'no-store',credentials:'same-origin'});const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'读取设置失败');
+          const token=await getSynoToken();const endpoint=token?`settings.cgi?SynoToken=${encodeURIComponent(token)}`:'settings.cgi';
+          const r=await fetch(endpoint,{cache:'no-store',credentials:'same-origin'});const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'读取设置失败');
           loadedShares=d.shares||[];const allowed=new Set(d.allowedDirectories||[]);el('autostart').checked=!!d.autostart;shares.replaceChildren();
           if(!loadedShares.length)shareState.textContent='未发现共享目录。可稍后刷新页面重试。';
           else shareState.textContent='勾选 Desktop Commander 文件工具可以访问的共享目录。';
