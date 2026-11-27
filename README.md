@@ -4,28 +4,37 @@ Synology DSM 原生 Desktop Commander 套件，目标设备为 DS3615xs-j / DSM 
 
 ## 项目状态
 
-仓库目前处于正式版开发与目标设备验收阶段。**尚未发布 1.0.0，也没有正式 SPK。** 自动构建、源码审查及目标 NAS 实机验收完成后，才会创建正式 Release。
+Desktop Commander SPK **1.0.0 正式版验收已通过，正在按正式发布流程构建和发布**。目标 NAS 上目前运行 `1.0.0-0015` 候选包；正式 SPK 内部版本递增为 `1.0.0-0016`，用于从候选包直接覆盖升级。
+
+- 正式验收记录：[实机验收证据](evidence/1.0.0-nas-acceptance-notes.md)
+- 自动构建与正式 Release：[GitHub Actions 发布工作流](.github/workflows/release.yml)
 
 ## 设计路线
 
 - 复用上游 [Desktop Commander MCP](https://github.com/wonderwhy-er/DesktopCommanderMCP) 的 MIT 授权本地 MCP 服务和 Remote Device Agent，固定到 `vendor/upstream.lock` 指定的源代码提交。
-- NAS 运行本地 MCP 服务和设备代理；设备代理使用 Desktop Commander 官方 Remote MCP 服务完成实际设备授权、工具转发及重连。这里不仿造 OAuth、不自建上游专有服务，也不把 NAS 本地状态冒充为 ChatGPT 连接状态。
-- 安装包须携带 Node.js 运行时和生产依赖。用户无需另外安装 Node.js、Docker 或 Windows 常驻进程。
-- MCP 文件工具默认仅授权套件 workspace；DSM 管理员可在管理页勾选要开放的共享目录。`allowedDirectories` 始终至少包含 workspace，避免空数组被上游解释成不限制路径。
+- NAS 运行本地 MCP 服务和设备代理；设备代理使用 Desktop Commander 官方 Remote MCP 服务完成实际设备授权、工具转发及重连。不仿造 OAuth，不自建上游专有服务，也不把 NAS 本地状态冒充为 ChatGPT 连接状态。
+- 安装包携带 Node.js 运行时和生产依赖；用户无需另外安装 Node.js、Docker 或 Windows 常驻进程。
+- MCP 文件工具默认仅授权套件 workspace；DSM 管理员可在管理页勾选要开放的共享目录。授权目录始终至少包含 workspace，避免空目录列表被上游解释成不限制路径。
 - 关闭上游遥测；设备授权凭据和工具配置存放在 DSM 持久套件变量目录，升级保留，卸载按用户选择处理。
-- 依用户要求，Remote Device Agent 与 MCP 服务由 DSM 套件生命周期脚本以 root 启动。共享目录白名单用于文件工具；root 权限的 Shell 工具仍可访问系统路径。
-- 管理页允许管理员设置共享目录与 NAS 开机自启动；服务代理进程退出时由 supervisor 自动重启，并采用递增退避和日志轮转。
-- 从 DSM 桌面打开套件管理页后，页面会轮询上游真实设备授权状态；发现有效授权链接时自动在该窗口打开官方验证页面。授权码不写入普通服务日志。
+- Remote Device Agent 与 MCP 服务由 DSM 套件生命周期脚本以 root 启动。共享目录白名单限制文件工具可见路径；root 权限的 Shell 工具仍可访问 NAS 系统路径。
+- 管理页允许管理员设置共享目录与 NAS 开机自启动；supervisor 在服务进程异常退出时自动重启，使用递增退避和日志轮转。
+- 管理页展示上游真实设备授权状态；有效授权链接会在 DSM 管理窗口打开官方验证页面。授权码不写入普通服务日志。
 
-## 目标环境与发布门槛
+## 目标环境与发布
 
-目标设备：DS3615xs-j，DSM 6.2.3-25426，Bromolow / x86_64。
+- NAS：Synology DS3615xs-j
+- DSM：6.2.3-25426
+- 平台 / 架构：Bromolow / x86_64
+- GitHub 正式版标签：`v1.0.0`
+- SPK 内部升级版本：`1.0.0-0016`
 
-GitHub Actions 能验证源码、许可证、元数据、脚本语法和 SPK 结构；它不能证明 DSM 已安装套件，也不能证明设备授权、ChatGPT 工具调用、掉线恢复或开机自启成功。root 运行扩大了 Shell 工具的权限范围。没有 DS3615xs-j 上的实测证据，不会将这些项目标记为通过，也不会发布正式版。
+正式发布由 GitHub Actions 完成目标 NAS 验收门槛、源码与许可证检查、SPK 构建及包结构检查。root 运行扩大 Shell 工具的权限范围；共享目录选择仅限制文件工具。
 
-## 开发说明
+## 文档
 
-见 [开发与验收记录](docs/开发与验收.md)、[安全设计](docs/安全设计.md) 和 [覆盖升级指南](docs/覆盖升级.md)。
+- [开发与验收记录](docs/开发与验收.md)
+- [实机验收证据](evidence/README.md)
+- [安全设计](docs/安全设计.md)
+- [覆盖升级指南](docs/覆盖升级.md)
 
-上游源码及许可证由 CI 按锁定提交获取，不直接把上游闭源 Remote MCP 服务代码复制进本仓库。第三方依赖的许可证清单将在 SPK 构建时随安装包附带。
-
+上游源码及许可证由 CI 按锁定提交获取；仓库不复制上游闭源 Remote MCP 服务端代码。第三方依赖许可证清单随 SPK 安装包附带。
