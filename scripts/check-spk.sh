@@ -6,7 +6,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 
 tar -tf "$SPK" > "$TMP/outer.list"
-for required in INFO package.tgz scripts/start-stop-status scripts/preupgrade scripts/postupgrade scripts/postuninst conf/privilege; do
+for required in INFO package.tgz scripts/start-stop-status scripts/supervisor.sh scripts/preupgrade scripts/postupgrade scripts/postuninst conf/privilege PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG; do
     grep -Fxq "$required" "$TMP/outer.list" || { echo "SPK 缺少 $required" >&2; exit 1; }
 done
 tar -xf "$SPK" -C "$TMP"
@@ -24,9 +24,12 @@ grep -Eq '(^|/)runtime/exec-path-fix\.cjs$' "$TMP/package.list"
 grep -Eq '(^|/)ui/config$' "$TMP/package.list"
 grep -Eq '(^|/)ui/index\.html$' "$TMP/package.list"
 grep -Eq '(^|/)ui/auth\.cgi$' "$TMP/package.list"
+grep -Eq '(^|/)ui/settings\.cgi$' "$TMP/package.list"
+grep -Eq '(^|/)ui/settings\.js$' "$TMP/package.list"
 mkdir -p "$TMP/package"
 tar -xzf "$TMP/package.tgz" -C "$TMP/package"
-sh -n "$TMP/scripts/start-stop-status" "$TMP/scripts/preupgrade" "$TMP/scripts/postupgrade" "$TMP/scripts/postuninst"
-sh -n "$TMP/package/ui/auth.cgi"
-grep -q '^unset LD_PRELOAD LD_LIBRARY_PATH$' "$TMP/package/runtime/node" || { echo "Node 启动器未清除 DSM 注入的宿主加载器变量。" >&2; exit 1; }
+sh -n "$TMP/scripts/start-stop-status" "$TMP/scripts/supervisor.sh" "$TMP/scripts/preupgrade" "$TMP/scripts/postupgrade" "$TMP/scripts/postuninst"
+sh -n "$TMP/package/ui/auth.cgi" "$TMP/package/ui/settings.cgi"
+node --check "$TMP/package/ui/settings.js"
 echo "SPK 结构、元数据及生命周期脚本语法检查通过。此检查不等同于 DSM 实机安装。"
+
