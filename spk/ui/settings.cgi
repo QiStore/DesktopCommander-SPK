@@ -11,10 +11,9 @@ respond() {
 
 AUTH_USER="$(/usr/syno/synoman/webman/modules/authenticate.cgi 2>/dev/null | tr -d '\r\n' || true)"
 [ -n "$AUTH_USER" ] || respond '401 Unauthorized' '{"error":"请先登录 DSM"}'
-# DSM 6 emits group members on the lines following `Group Members:` as
-# `0:[admin]`; they are not on the heading line itself.
-MEMBERS="$(/usr/syno/sbin/synogroup --get administrators 2>/dev/null | awk 'BEGIN{members=0} /^Group Members:/ {members=1; next} members && match($0, /\[[^]]+\]/) {value=substr($0, RSTART+1, RLENGTH-2); print value}')"
-case " $MEMBERS " in *" $AUTH_USER "*) ;; *) respond '403 Forbidden' '{"error":"只有 DSM 管理员可以修改设置"}' ;; esac
+if ! id -nG "$AUTH_USER" 2>/dev/null | tr ' ' '\n' | grep -qx administrators; then
+    respond '403 Forbidden' '{"error":"只有 DSM 管理员可以修改设置"}'
+fi
 
 case "${REQUEST_METHOD:-GET}" in
   GET) ;;
@@ -44,4 +43,5 @@ PKGVAR="${STATE_FILE%/auth-state.json}"
 CONFIG="$PKGVAR/home/.claude-server-commander/config.json"
 SHARES="$PKGVAR/shared-directories.json"
 AUTOSTART="$PKGVAR/home/.claude-server-commander/autostart"
+printf 'Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n'
 exec "$SCRIPT_DIR/../runtime/node" "$SCRIPT_DIR/settings.js" "$CONFIG" "$SHARES" "$AUTOSTART" "$PKGVAR/workspace"
