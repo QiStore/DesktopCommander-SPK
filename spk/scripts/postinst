@@ -1,39 +1,105 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
+
+# DSM can inject glibc-only loader hooks; this package ships a musl Node runtime.
+unset LD_PRELOAD LD_LIBRARY_PATH
 
 PKG="DesktopCommander-SPK"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR=${0%/*}
+[ "$SCRIPT_DIR" != "$0" ] || SCRIPT_DIR=.
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" && pwd)"
 . "$SCRIPT_DIR/pkgvar"
 VAR="$(dc_pkgvar)"
 PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
 CONFIG="$VAR/home/.claude-server-commander/config.json"
+NODE_LOG="$VAR/log/config-init-node.log"
 
+STEP="解析套件数据目录"
 fail() {
     rc=$?
     if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
-        printf 'Desktop Commander 初始化失败（退出码 %s），数据目录：%s\n' "$rc" "$VAR" > "$SYNOPKG_TEMP_LOGFILE"
+        {
+            printf 'Desktop Commander 初始化失败（退出码 %s，失败阶段：%s），数据目录：%s\n' "$rc" "$STEP" "$VAR"
+            case "$STEP" in
+                "预检套件 Node 运行时"|"更新 Desktop Commander 配置")
+                    if [ -s "$NODE_LOG" ]; then
+                        printf '\nNode 运行时输出：\n'
+                        cat "$NODE_LOG"
+                    fi
+                    ;;
+            esac
+        } > "$SYNOPKG_TEMP_LOGFILE"
     fi
     exit "$rc"
 }
 trap fail EXIT HUP INT TERM
 
-# This hook runs as root only to create the package-owned persistent data
-# directory. The service and all data remain owned by the unprivileged package account.
-id "$PKG" >/dev/null 2>&1 || { echo "套件服务账户不存在：$PKG" >&2; exit 1; }
+STEP="创建持久数据目录"
 mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
-chown "$PKG:http" "$VAR"
+: > "$NODE_LOG"
+chmod 600 "$NODE_LOG"
+STEP="设置 root 服务数据权限"
+chown root:http "$VAR"
 chmod 2710 "$VAR"
-chown "$PKG:$PKG" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
-chmod 700 "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+chown -R root:root "$VAR/home" "$VAR/log" "$VAR/workspace"
+chown root:http "$VAR/home/.claude-server-commander" "$VAR/log" "$VAR/workspace"
+chmod 711 "$VAR/home"
+chmod 700 "$VAR/home/.desktop-commander-device"
+chmod 2770 "$VAR/home/.claude-server-commander" "$VAR/workspace"
+chmod 2750 "$VAR/log"
+[ -s "$VAR/autostart" ] || printf 'true\n' > "$VAR/autostart"
+[ -s "$VAR/home/.claude-server-commander/autostart" ] || printf 'true\n' > "$VAR/home/.claude-server-commander/autostart"
+chown root:http "$VAR/home/.claude-server-commander/autostart"
+chmod 660 "$VAR/home/.claude-server-commander/autostart"
+STEP="写入授权状态文件路径"
 printf '%s\n' "$VAR/auth-state.json" > "$PKGDEST/ui/auth-state.path"
 chmod 644 "$PKGDEST/ui/auth-state.path"
 if [ -e "$VAR/auth-state.json" ]; then
+    STEP="设置授权状态文件权限"
     chown "$PKG:http" "$VAR/auth-state.json"
     chmod 640 "$VAR/auth-state.json"
 fi
-if [ ! -s "$CONFIG" ]; then
-    printf '%s\n' "{\"allowedDirectories\":[\"$VAR/workspace\"],\"telemetryEnabled\":false}" > "$CONFIG"
-    chown "$PKG:$PKG" "$CONFIG"
-    chmod 600 "$CONFIG"
+# Call the bundled musl loader directly during installation. Do not depend on
+# external path-discovery commands in the DSM lifecycle environment.
+STEP="Locate bundled Node runtime"
+NODE_LOADER=""
+for candidate in "$PKGDEST"/runtime/lib/ld-musl-*.so.1; do
+    if [ -f "$candidate" ]; then NODE_LOADER="$candidate"; break; fi
+done
+[ -n "$NODE_LOADER" ] || { echo "套件 Node 运行时加载器不存在：$PKGDEST/runtime/lib" >&2; exit 127; }
+[ -x "$PKGDEST/runtime/bin/node" ] || { echo "套件 Node 可执行文件不存在：$PKGDEST/runtime/bin/node" >&2; exit 127; }
+# Keep at least the package workspace in the upstream allowlist; an empty
+# allowedDirectories list is interpreted by upstream as unrestricted access.
+STEP="预检套件 Node 运行时"
+if "$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" --version >"$NODE_LOG" 2>&1; then
+    :
+else
+    rc=$?
+    exit "$rc"
 fi
+STEP="更新 Desktop Commander 配置"
+if "$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" - "$CONFIG" >>"$NODE_LOG" 2>&1 <<'NODE'
+const fs = require('fs');
+const file = process.argv[2];
+let config = {};
+try { config = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) {}
+if (!Array.isArray(config.allowedDirectories) || config.allowedDirectories.length === 0) {
+  config.allowedDirectories = [require('path').resolve(file, '../../..', 'workspace')];
+}
+config.telemetryEnabled = false;
+const tmp = `${file}.tmp`;
+fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + '\n', { mode: 0o660 });
+fs.renameSync(tmp, file);
+NODE
+then
+    :
+else
+    rc=$?
+    exit "$rc"
+fi
+STEP="设置 Desktop Commander 配置权限"
+chown root:http "$CONFIG"
+chmod 660 "$CONFIG"
 trap - EXIT HUP INT TERM

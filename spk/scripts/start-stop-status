@@ -1,9 +1,13 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 PKG="DesktopCommander-SPK"
 PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR=${0%/*}
+[ "$SCRIPT_DIR" != "$0" ] || SCRIPT_DIR=.
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" && pwd)"
 . "$SCRIPT_DIR/pkgvar"
 PKGVAR="$(dc_pkgvar)"
 NODE="$PKGDEST/runtime/node"
@@ -12,34 +16,79 @@ HOME_DIR="$PKGVAR/home"
 LOG_DIR="$PKGVAR/log"
 PID_FILE="$PKGVAR/remote.pid"
 LOG_FILE="$LOG_DIR/remote.log"
+AUTOSTART_FILE="$HOME_DIR/.claude-server-commander/autostart"
+SHARES_FILE="$PKGVAR/shared-directories.json"
 
 is_running() {
     [ -s "$PID_FILE" ] || return 1
     pid="$(cat "$PID_FILE" 2>/dev/null || true)"
     case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-    kill -0 "$pid" 2>/dev/null
+    kill -0 "$pid" 2>/dev/null || return 1
+    [ -r "/proc/$pid/cmdline" ] || return 1
+    tr '\000' ' ' < "/proc/$pid/cmdline" | grep -Fq 'supervisor.sh'
+}
+
+refresh_shares() {
+    "$NODE" - "$SHARES_FILE" <<'NODE'
+const fs = require('fs');
+const cp = require('child_process');
+const path = require('path');
+const out = process.argv[2];
+const cmd = '/usr/syno/sbin/synoshare';
+const enumText = cp.execFileSync(cmd, ['--enum', 'ALL'], {encoding:'utf8'});
+const marker = enumText.match(/\d+ Listed:\s*([\s\S]*)/);
+const names = marker ? marker[1].split(/\r?\n/).map(x=>x.trim()).filter(Boolean) : [];
+const shares = [];
+for (const name of names) {
+  try {
+    const text = cp.execFileSync(cmd, ['--get', name], {encoding:'utf8'});
+    const m = text.match(/^\s*Path\s*\.*\s*\[([^\]]+)\]/m);
+    if (!m) continue;
+    const real = fs.realpathSync(m[1]);
+    if (!/^\/volume\d+\/.+/.test(real) || !fs.statSync(real).isDirectory()) continue;
+    shares.push({name, path:real});
+  } catch (_) {}
+}
+const tmp = out + '.tmp';
+fs.writeFileSync(tmp, JSON.stringify({shares}, null, 2) + '\n', {mode:0o640});
+fs.renameSync(tmp, out);
+NODE
+    chown root:http "$SHARES_FILE"
+    chmod 640 "$SHARES_FILE"
 }
 
 start() {
-    if is_running; then
+    if [ "${SYNOPKG_PKG_STATUS:-}" = "" ] && [ -r "$AUTOSTART_FILE" ] && [ "$(cat "$AUTOSTART_FILE" 2>/dev/null || true)" = "false" ]; then
+        echo "Desktop Commander 自启动已关闭；跳过 DSM 启动阶段。"
         exit 0
     fi
+    if is_running; then exit 0; fi
     mkdir -p "$HOME_DIR/.claude-server-commander" "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
-    chmod 700 "$HOME_DIR" "$HOME_DIR/.claude-server-commander" "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
+    chmod 711 "$HOME_DIR"
+    chmod 700 "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
+    chmod 770 "$HOME_DIR/.claude-server-commander"
+    [ -s "$AUTOSTART_FILE" ] || printf 'true\n' > "$AUTOSTART_FILE"
     if [ ! -s "$HOME_DIR/.claude-server-commander/config.json" ]; then
-        printf '%s\n' "{\"allowedDirectories\":[\"$PKGVAR/workspace\"],\"telemetryEnabled\":false}" > "$HOME_DIR/.claude-server-commander/config.json"
-        chmod 600 "$HOME_DIR/.claude-server-commander/config.json"
+        printf '{"allowedDirectories":["%s"],"telemetryEnabled":false}\n' "$PKGVAR/workspace" > "$HOME_DIR/.claude-server-commander/config.json"
     fi
-
+    chown root:http "$HOME_DIR/.claude-server-commander/config.json" "$AUTOSTART_FILE"
+    chmod 660 "$HOME_DIR/.claude-server-commander/config.json" "$AUTOSTART_FILE"
+    if ! refresh_shares; then
+        echo "警告：无法刷新 DSM 共享目录清单；继续启动服务。"
+        if [ ! -s "$SHARES_FILE" ]; then
+            printf '{"shares":[]}\n' > "$SHARES_FILE"
+            chown root:http "$SHARES_FILE"
+            chmod 640 "$SHARES_FILE"
+        fi
+    fi
+    if [ -f "$LOG_FILE" ] && [ "$(wc -c < "$LOG_FILE")" -gt 10485760 ]; then
+        mv -f "$LOG_FILE" "$LOG_FILE.1"
+    fi
     cd "$PKGDEST/upstream"
-    # The upstream Remote Device Agent starts its local MCP server as a child
-    # and connects outbound to the official Remote MCP service.
-    nohup env HOME="$HOME_DIR" PATH="$PKGDEST/runtime:$PATH" DC_NODE_LAUNCHER="$NODE" DC_AUTH_STATUS_FILE="$PKGVAR/auth-state.json" \
-        NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require=$PKGDEST/runtime/exec-path-fix.cjs" \
-        DC_REMOTE_DEVICE=true DESKTOP_COMMANDER_DISABLE_TELEMETRY=1 \
-        "$NODE" "$APP" remote --disable-no-sleep >>"$LOG_FILE" 2>&1 </dev/null &
+    nohup "$SCRIPT_DIR/supervisor.sh" "$NODE" "$APP" "$PKGDEST" "$PKGVAR" >>"$LOG_FILE" 2>&1 </dev/null &
     echo "$!" > "$PID_FILE"
-    chmod 600 "$PID_FILE" "$LOG_FILE" 2>/dev/null || true
+    chown root:http "$PID_FILE" "$LOG_FILE" 2>/dev/null || true
+    chmod 640 "$PID_FILE" "$LOG_FILE" 2>/dev/null || true
 }
 
 stop() {
@@ -47,13 +96,8 @@ stop() {
         pid="$(cat "$PID_FILE")"
         kill -TERM "$pid" 2>/dev/null || true
         n=0
-        while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 20 ]; do
-            sleep 1
-            n=$((n + 1))
-        done
-        if kill -0 "$pid" 2>/dev/null; then
-            kill -KILL "$pid" 2>/dev/null || true
-        fi
+        while kill -0 "$pid" 2>/dev/null && [ "$n" -lt 25 ]; do sleep 1; n=$((n + 1)); done
+        if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
     fi
     rm -f "$PID_FILE"
 }
@@ -61,11 +105,7 @@ stop() {
 case "${1:-}" in
     start) start ;;
     stop) stop ;;
-    status)
-        if is_running; then echo "running"; exit 0; fi
-        echo "stopped"; exit 1
-        ;;
+    status) if is_running; then echo running; exit 0; else echo stopped; exit 1; fi ;;
     log) tail -n 200 "$LOG_FILE" 2>/dev/null || true ;;
     *) echo "Usage: $0 {start|stop|status|log}" >&2; exit 2 ;;
 esac
-

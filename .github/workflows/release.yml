@@ -30,9 +30,9 @@ jobs:
       - name: 构建正式 SPK
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work -e PACKAGE_VERSION="$VERSION-0006" node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" PACKAGE_VERSION="$PACKAGE_VERSION" sh scripts/build-spk.sh'
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work -e PACKAGE_VERSION="$VERSION" node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip imagemagick; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" PACKAGE_VERSION="$PACKAGE_VERSION" sh scripts/build-spk.sh'
       - name: 检查正式 SPK
-        run: sh scripts/check-spk.sh "build/DesktopCommanderSPK-${GITHUB_REF_NAME#v}-0006-bromolow.spk"
+        run: sh scripts/check-spk.sh "build/DesktopCommanderSPK-${GITHUB_REF_NAME#v}-bromolow.spk"
       - name: 发布正式 Release
         uses: softprops/action-gh-release@v2
         with:

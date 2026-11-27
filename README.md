@@ -11,16 +11,17 @@ Synology DSM 原生 Desktop Commander 套件，目标设备为 DS3615xs-j / DSM 
 - 复用上游 [Desktop Commander MCP](https://github.com/wonderwhy-er/DesktopCommanderMCP) 的 MIT 授权本地 MCP 服务和 Remote Device Agent，固定到 `vendor/upstream.lock` 指定的源代码提交。
 - NAS 运行本地 MCP 服务和设备代理；设备代理使用 Desktop Commander 官方 Remote MCP 服务完成实际设备授权、工具转发及重连。这里不仿造 OAuth、不自建上游专有服务，也不把 NAS 本地状态冒充为 ChatGPT 连接状态。
 - 安装包须携带 Node.js 运行时和生产依赖。用户无需另外安装 Node.js、Docker 或 Windows 常驻进程。
-- MCP 文件访问从一个受限的专用工作目录开始；只把用户明确授权的共享目录加入 Desktop Commander 的 `allowedDirectories`。该列表不能为空，因为上游将空列表定义为不限制目录。
+- MCP 文件工具默认仅授权套件 workspace；DSM 管理员可在管理页勾选要开放的共享目录。`allowedDirectories` 始终至少包含 workspace，避免空数组被上游解释成不限制路径。
 - 关闭上游遥测；设备授权凭据和工具配置存放在 DSM 持久套件变量目录，升级保留，卸载按用户选择处理。
-- 服务按 DSM 套件专用账户运行，不以 root 执行用户命令。
+- 依用户要求，Remote Device Agent 与 MCP 服务由 DSM 套件生命周期脚本以 root 启动。共享目录白名单用于文件工具；root 权限的 Shell 工具仍可访问系统路径。
+- 管理页允许管理员设置共享目录与 NAS 开机自启动；服务代理进程退出时由 supervisor 自动重启，并采用递增退避和日志轮转。
 - 从 DSM 桌面打开套件管理页后，页面会轮询上游真实设备授权状态；发现有效授权链接时自动在该窗口打开官方验证页面。授权码不写入普通服务日志。
 
 ## 目标环境与发布门槛
 
 目标设备：DS3615xs-j，DSM 6.2.3-25426，Bromolow / x86_64。
 
-GitHub Actions 能验证源码、许可证、元数据、脚本语法和 SPK 结构；它不能证明 DSM 已安装套件，也不能证明设备授权、ChatGPT 工具调用或开机自启成功。没有 DS3615xs-j 上的实测证据，不会将这些项目标记为通过，也不会发布正式版。
+GitHub Actions 能验证源码、许可证、元数据、脚本语法和 SPK 结构；它不能证明 DSM 已安装套件，也不能证明设备授权、ChatGPT 工具调用、掉线恢复或开机自启成功。root 运行扩大了 Shell 工具的权限范围。没有 DS3615xs-j 上的实测证据，不会将这些项目标记为通过，也不会发布正式版。
 
 ## 开发说明
 

@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 json_response() {
     status="$1"
@@ -14,7 +16,9 @@ json_response() {
 
 # No DSM session/account revalidation here. The status page is a read-only
 # DSM package UI endpoint; it returns authorization URL/code and no tokens.
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR=${0%/*}
+[ "$SCRIPT_DIR" != "$0" ] || SCRIPT_DIR=.
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" && pwd)"
 PATH_FILE="$SCRIPT_DIR/auth-state.path"
 [ -r "$PATH_FILE" ] || json_response '200 OK' '{"state":"waiting"}'
 STATE_FILE="$(cat "$PATH_FILE" 2>/dev/null || true)"

@@ -1,15 +1,15 @@
 {
   "defaults": {
-    "run-as": "package"
+    "run-as": "root"
   },
   "ctrl-script": [
-    { "action": "start", "run-as": "package" },
-    { "action": "stop", "run-as": "package" },
-    { "action": "status", "run-as": "package" },
+    { "action": "start", "run-as": "root" },
+    { "action": "stop", "run-as": "root" },
+    { "action": "status", "run-as": "root" },
     { "action": "postinst", "run-as": "root" },
     { "action": "postupgrade", "run-as": "root" },
-    { "action": "preuninst", "run-as": "package" },
-    { "action": "postuninst", "run-as": "package" }
+    { "action": "preuninst", "run-as": "root" },
+    { "action": "postuninst", "run-as": "root" }
   ]
 }
 

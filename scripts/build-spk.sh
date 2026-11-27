@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT="${OUT_DIR:-$ROOT/build}"
 UPSTREAM_DIR="${UPSTREAM_DIR:-$ROOT/vendor/DesktopCommanderMCP}"
 NODE_BINARY="${NODE_BINARY:-$(command -v node || true)}"
-PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0006}"
+PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0015}"
 
 [ -n "$NODE_BINARY" ] || { echo "缺少 NODE_BINARY。" >&2; exit 1; }
 [ -f "$UPSTREAM_DIR/package.json" ] || { echo "找不到上游源码：$UPSTREAM_DIR" >&2; exit 1; }
@@ -46,8 +46,14 @@ if ldd "$NODE_BINARY" 2>&1 | grep -q 'musl'; then
     cp -L "$LOADER" "$OUT/root/target/runtime/lib/$(basename "$LOADER")"
     cat > "$OUT/root/target/runtime/node" <<'EOF'
 #!/bin/sh
-HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-LOADER="$(find "$HERE/lib" -maxdepth 1 -name 'ld-musl-*.so.1' -print -quit)"
+HERE=${0%/*}
+[ "$HERE" != "$0" ] || HERE=.
+HERE="$(CDPATH= cd -P -- "$HERE" && pwd -P)"
+unset LD_PRELOAD LD_LIBRARY_PATH
+LOADER=""
+for candidate in "$HERE"/lib/ld-musl-*.so.1; do
+    if [ -f "$candidate" ]; then LOADER="$candidate"; break; fi
+done
 [ -n "$LOADER" ] || { echo "Node runtime loader is missing." >&2; exit 127; }
 exec "$LOADER" --library-path "$HERE/lib" "$HERE/bin/node" "$@"
 EOF
@@ -73,17 +79,21 @@ mkdir -p "$OUT/root/target/ui"
 cp "$ROOT/docs/安全设计.md" "$OUT/root/target/ui/安全说明.txt"
 cp -a "$ROOT/spk/ui/." "$OUT/root/target/ui/"
 chmod 755 "$OUT/root/target/ui/auth.cgi"
+chmod 755 "$OUT/root/target/ui/settings.cgi"
 mkdir -p "$OUT/root/target/ui/images"
 for size in 16 24 32 48 64 72 256; do
     cp "$UPSTREAM_DIR/logo.png" "$OUT/root/target/ui/images/icon_${size}.png"
 done
+command -v magick >/dev/null 2>&1 || { echo "缺少 ImageMagick magick 命令，用于生成 DSM 官方尺寸套件图标。" >&2; exit 1; }
+magick "$UPSTREAM_DIR/logo.png" -resize 72x72 -background none -gravity center -extent 72x72 "$OUT/root/PACKAGE_ICON.PNG"
+magick "$UPSTREAM_DIR/logo.png" -resize 256x256 -background none -gravity center -extent 256x256 "$OUT/root/PACKAGE_ICON_256.PNG"
 
 # A test-build package is not a release. Formal release is gated by NAS evidence.
 sed -i "s/^version=.*/version=\"$PACKAGE_VERSION\"/" "$OUT/root/INFO"
 find "$OUT/root/scripts" -type f -exec chmod 755 {} \;
 
 tar -czf "$OUT/root/package.tgz" -C "$OUT/root/target" .
-tar -cf "$OUT/DesktopCommanderSPK-$PACKAGE_VERSION-bromolow.spk" -C "$OUT/root" INFO package.tgz scripts conf
+tar -cf "$OUT/DesktopCommanderSPK-$PACKAGE_VERSION-bromolow.spk" -C "$OUT/root" INFO package.tgz scripts conf PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG
 
 echo "SPK 构建完成（内部候选包，不能据此宣称 NAS 兼容或正式发布）：$OUT/DesktopCommanderSPK-$PACKAGE_VERSION-bromolow.spk"
 
