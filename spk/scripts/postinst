@@ -3,6 +3,9 @@ set -eu
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export PATH
 
+# DSM can inject glibc-only loader hooks; this package ships a musl Node runtime.
+unset LD_PRELOAD LD_LIBRARY_PATH
+
 PKG="DesktopCommander-SPK"
 SCRIPT_DIR=${0%/*}
 [ "$SCRIPT_DIR" != "$0" ] || SCRIPT_DIR=.
