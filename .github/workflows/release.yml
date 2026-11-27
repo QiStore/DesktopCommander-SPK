@@ -30,10 +30,17 @@ jobs:
           node scripts/verify-release-evidence.mjs evidence/1.0.0-nas-acceptance.json
       - name: 构建正式 SPK
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work -e PACKAGE_VERSION="$VERSION" node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip imagemagick; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" PACKAGE_VERSION="$PACKAGE_VERSION" sh scripts/build-spk.sh'
+          RELEASE_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION="$RELEASE_VERSION"
+          # Synology requires an increasing build revision for in-place upgrades.
+          # The published candidate is 1.0.0-0015; stable 1.0.0 uses revision 0016.
+          if [ "$RELEASE_VERSION" = "1.0.0" ]; then
+            PACKAGE_VERSION="1.0.0-0016"
+          fi
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work -e PACKAGE_VERSION="$PACKAGE_VERSION" node:22.19.0-alpine sh -ec 'apk add --no-cache bash git tar gzip imagemagick; NODE_BINARY="$(command -v node)" UPSTREAM_DIR="$PWD/vendor/DesktopCommanderMCP" PACKAGE_VERSION="$PACKAGE_VERSION" sh scripts/build-spk.sh'
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
       - name: 检查正式 SPK
-        run: sh scripts/check-spk.sh "build/DesktopCommanderSPK-${GITHUB_REF_NAME#v}-bromolow.spk"
+        run: sh scripts/check-spk.sh "build/DesktopCommanderSPK-${PACKAGE_VERSION}-bromolow.spk"
       - name: 发布正式 Release
         uses: softprops/action-gh-release@v2
         with:
