@@ -48,7 +48,7 @@ if ldd "$NODE_BINARY" 2>&1 | grep -q 'musl'; then
 #!/bin/sh
 HERE=${0%/*}
 [ "$HERE" != "$0" ] || HERE=.
-HERE="$(CDPATH= cd -- "$HERE" && pwd)"
+HERE="$(CDPATH= cd -P -- "$HERE" && pwd -P)"
 unset LD_PRELOAD LD_LIBRARY_PATH
 LOADER=""
 for candidate in "$HERE"/lib/ld-musl-*.so.1; do
