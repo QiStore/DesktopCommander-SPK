@@ -1,24 +1,32 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 PKG="DesktopCommander-SPK"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR=${0%/*}
+[ "$SCRIPT_DIR" != "$0" ] || SCRIPT_DIR=.
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" && pwd)"
 . "$SCRIPT_DIR/pkgvar"
 VAR="$(dc_pkgvar)"
 PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
 CONFIG="$VAR/home/.claude-server-commander/config.json"
 
+STEP="解析套件数据目录"
 fail() {
     rc=$?
     if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
-        printf 'Desktop Commander 升级初始化失败（退出码 %s），数据目录：%s\n' "$rc" "$VAR" > "$SYNOPKG_TEMP_LOGFILE"
+        printf 'Desktop Commander 升级初始化失败（退出码 %s，失败阶段：%s），数据目录：%s\n' "$rc" "$STEP" "$VAR" > "$SYNOPKG_TEMP_LOGFILE"
     fi
     exit "$rc"
 }
 trap fail EXIT HUP INT TERM
 
+STEP="检查套件服务账户"
 id "$PKG" >/dev/null 2>&1 || { echo "套件服务账户不存在：$PKG" >&2; exit 1; }
+STEP="创建持久数据目录"
 mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+STEP="设置持久数据目录权限"
 chown "$PKG:http" "$VAR"
 chmod 2710 "$VAR"
 chown "$PKG:$PKG" "$VAR/home" "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
@@ -29,8 +37,9 @@ if [ -e "$VAR/auth-state.json" ]; then
     chown "$PKG:http" "$VAR/auth-state.json"
     chmod 640 "$VAR/auth-state.json"
 fi
-# Call the bundled musl loader directly during installation. The node wrapper
-# uses dirname/find from PATH, which is not guaranteed in DSM lifecycle hooks.
+# Call the bundled musl loader directly during installation. Do not depend on
+# external path-discovery commands in the DSM lifecycle environment.
+STEP="定位套件 Node 运行时"
 NODE_LOADER=""
 for candidate in "$PKGDEST"/runtime/lib/ld-musl-*.so.1; do
     if [ -f "$candidate" ]; then NODE_LOADER="$candidate"; break; fi
@@ -39,6 +48,7 @@ done
 [ -x "$PKGDEST/runtime/bin/node" ] || { echo "套件 Node 可执行文件不存在：$PKGDEST/runtime/bin/node" >&2; exit 127; }
 # An empty allowedDirectories list means unrestricted paths in upstream.
 # Preserve other user settings while explicitly removing the package path allowlist.
+STEP="更新 Desktop Commander 配置"
 "$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" - "$CONFIG" <<'NODE'
 const fs = require('fs');
 const file = process.argv[2];
@@ -50,6 +60,7 @@ const tmp = `${file}.tmp`;
 fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(tmp, file);
 NODE
+STEP="设置 Desktop Commander 配置权限"
 chown "$PKG:$PKG" "$CONFIG"
 chmod 600 "$CONFIG"
 # Device authorization, other config fields, logs, and workspace are preserved.

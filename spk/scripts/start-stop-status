@@ -1,9 +1,13 @@
 #!/bin/sh
 set -eu
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH
 
 PKG="DesktopCommander-SPK"
 PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR=${0%/*}
+[ "$SCRIPT_DIR" != "$0" ] || SCRIPT_DIR=.
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" && pwd)"
 . "$SCRIPT_DIR/pkgvar"
 PKGVAR="$(dc_pkgvar)"
 NODE="$PKGDEST/runtime/node"
@@ -27,7 +31,7 @@ start() {
     mkdir -p "$HOME_DIR/.claude-server-commander" "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
     chmod 700 "$HOME_DIR" "$HOME_DIR/.claude-server-commander" "$HOME_DIR/.desktop-commander-device" "$LOG_DIR" "$PKGVAR/workspace"
     if [ ! -s "$HOME_DIR/.claude-server-commander/config.json" ]; then
-        printf '%s\n' "{\"allowedDirectories\":[\"$PKGVAR/workspace\"],\"telemetryEnabled\":false}" > "$HOME_DIR/.claude-server-commander/config.json"
+        printf '%s\n' '{"allowedDirectories":[],"telemetryEnabled":false}' > "$HOME_DIR/.claude-server-commander/config.json"
         chmod 600 "$HOME_DIR/.claude-server-commander/config.json"
     fi
 
