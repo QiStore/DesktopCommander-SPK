@@ -11,12 +11,23 @@ SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" && pwd)"
 VAR="$(dc_pkgvar)"
 PKGDEST="${SYNOPKG_PKGDEST:-/var/packages/$PKG/target}"
 CONFIG="$VAR/home/.claude-server-commander/config.json"
+NODE_LOG="$VAR/log/config-init-node.log"
 
 STEP="解析套件数据目录"
 fail() {
     rc=$?
     if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
-        printf 'Desktop Commander 初始化失败（退出码 %s，失败阶段：%s），数据目录：%s\n' "$rc" "$STEP" "$VAR" > "$SYNOPKG_TEMP_LOGFILE"
+        {
+            printf 'Desktop Commander 初始化失败（退出码 %s，失败阶段：%s），数据目录：%s\n' "$rc" "$STEP" "$VAR"
+            case "$STEP" in
+                "预检套件 Node 运行时"|"更新 Desktop Commander 配置")
+                    if [ -s "$NODE_LOG" ]; then
+                        printf '\nNode 运行时输出：\n'
+                        cat "$NODE_LOG"
+                    fi
+                    ;;
+            esac
+        } > "$SYNOPKG_TEMP_LOGFILE"
     fi
     exit "$rc"
 }
@@ -28,6 +39,8 @@ STEP="检查套件服务账户"
 id "$PKG" >/dev/null 2>&1 || { echo "套件服务账户不存在：$PKG" >&2; exit 1; }
 STEP="创建持久数据目录"
 mkdir -p "$VAR/home/.claude-server-commander" "$VAR/home/.desktop-commander-device" "$VAR/log" "$VAR/workspace"
+: > "$NODE_LOG"
+chmod 600 "$NODE_LOG"
 STEP="设置持久数据目录权限"
 chown "$PKG:http" "$VAR"
 chmod 2710 "$VAR"
@@ -52,8 +65,15 @@ done
 [ -x "$PKGDEST/runtime/bin/node" ] || { echo "套件 Node 可执行文件不存在：$PKGDEST/runtime/bin/node" >&2; exit 127; }
 # An empty allowedDirectories list means unrestricted paths in upstream.
 # Preserve other user settings while explicitly removing the package path allowlist.
+STEP="预检套件 Node 运行时"
+if "$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" --version >"$NODE_LOG" 2>&1; then
+    :
+else
+    rc=$?
+    exit "$rc"
+fi
 STEP="更新 Desktop Commander 配置"
-"$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" - "$CONFIG" <<'NODE'
+if "$NODE_LOADER" --library-path "$PKGDEST/runtime/lib" "$PKGDEST/runtime/bin/node" - "$CONFIG" >>"$NODE_LOG" 2>&1 <<'NODE'
 const fs = require('fs');
 const file = process.argv[2];
 let config = {};
@@ -64,6 +84,12 @@ const tmp = `${file}.tmp`;
 fs.writeFileSync(tmp, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(tmp, file);
 NODE
+then
+    :
+else
+    rc=$?
+    exit "$rc"
+fi
 STEP="设置 Desktop Commander 配置权限"
 chown "$PKG:$PKG" "$CONFIG"
 chmod 600 "$CONFIG"
