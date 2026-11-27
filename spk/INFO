@@ -1,5 +1,5 @@
 package="DesktopCommander-SPK"
-version="1.0.0-0010"
+version="1.0.0-0014"
 displayname="Desktop Commander"
 description="Desktop Commander MCP 原生服务套件"
 arch="bromolow"
