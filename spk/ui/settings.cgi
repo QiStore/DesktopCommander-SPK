@@ -11,7 +11,9 @@ respond() {
 
 AUTH_USER="$(/usr/syno/synoman/webman/modules/authenticate.cgi 2>/dev/null | tr -d '\r\n' || true)"
 [ -n "$AUTH_USER" ] || respond '401 Unauthorized' '{"error":"请先登录 DSM"}'
-MEMBERS="$(/usr/syno/sbin/synogroup --get administrators 2>/dev/null | awk -F'[][]' '/Group Members/{for(i=2;i<=NF;i+=2)printf "%s ",$i}')"
+# DSM 6 emits group members on the lines following `Group Members:` as
+# `0:[admin]`; they are not on the heading line itself.
+MEMBERS="$(/usr/syno/sbin/synogroup --get administrators 2>/dev/null | awk 'BEGIN{members=0} /^Group Members:/ {members=1; next} members && match($0, /\[[^]]+\]/) {value=substr($0, RSTART+1, RLENGTH-2); print value}')"
 case " $MEMBERS " in *" $AUTH_USER "*) ;; *) respond '403 Forbidden' '{"error":"只有 DSM 管理员可以修改设置"}' ;; esac
 
 case "${REQUEST_METHOD:-GET}" in
