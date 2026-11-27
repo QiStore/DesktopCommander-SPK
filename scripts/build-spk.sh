@@ -5,7 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 OUT="${OUT_DIR:-$ROOT/build}"
 UPSTREAM_DIR="${UPSTREAM_DIR:-$ROOT/vendor/DesktopCommanderMCP}"
 NODE_BINARY="${NODE_BINARY:-$(command -v node || true)}"
-PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0006}"
+PACKAGE_VERSION="${PACKAGE_VERSION:-1.0.0-0009}"
 
 [ -n "$NODE_BINARY" ] || { echo "缺少 NODE_BINARY。" >&2; exit 1; }
 [ -f "$UPSTREAM_DIR/package.json" ] || { echo "找不到上游源码：$UPSTREAM_DIR" >&2; exit 1; }
@@ -46,8 +46,13 @@ if ldd "$NODE_BINARY" 2>&1 | grep -q 'musl'; then
     cp -L "$LOADER" "$OUT/root/target/runtime/lib/$(basename "$LOADER")"
     cat > "$OUT/root/target/runtime/node" <<'EOF'
 #!/bin/sh
-HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-LOADER="$(find "$HERE/lib" -maxdepth 1 -name 'ld-musl-*.so.1' -print -quit)"
+HERE=${0%/*}
+[ "$HERE" != "$0" ] || HERE=.
+HERE="$(CDPATH= cd -- "$HERE" && pwd)"
+LOADER=""
+for candidate in "$HERE"/lib/ld-musl-*.so.1; do
+    if [ -f "$candidate" ]; then LOADER="$candidate"; break; fi
+done
 [ -n "$LOADER" ] || { echo "Node runtime loader is missing." >&2; exit 127; }
 exec "$LOADER" --library-path "$HERE/lib" "$HERE/bin/node" "$@"
 EOF
